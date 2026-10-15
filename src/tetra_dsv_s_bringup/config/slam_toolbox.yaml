@@ -1,0 +1,108 @@
+# slam_toolbox — 실기 지도 작성용 (online async).
+#
+# 시뮬에서 검증한 설정을 실기 조건에 맞춰 옮긴 것입니다. 실기가 시뮬과
+# 다른 점만 아래에 표시했습니다.
+
+slam_toolbox:
+  ros__parameters:
+
+    solver_plugin: solver_plugins::CeresSolver
+    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner: SCHUR_JACOBI
+    ceres_trust_strategy: LEVENBERG_MARQUARDT
+    ceres_dogleg_type: TRADITIONAL_DOGLEG
+    ceres_loss_function: None
+
+    odom_frame: odom
+    map_frame: map
+    base_frame: base_footprint      # EKF 가 여기까지 TF 를 내줍니다
+    scan_topic: /scan
+    mode: mapping
+
+    debug_logging: false
+    throttle_scans: 1
+    transform_publish_period: 0.02
+    map_update_interval: 2.0
+
+    # VLP-16 은 100 m 넘게 보지만, 실내에서 그 거리의 반사는 대부분 잡음이고
+    # 스캔매칭만 느려집니다.
+    #
+    # 20.0 -> 4.0 으로 줄였습니다 (2026-08-14). 실험실이 2.4 x 3.0 m 밖에
+    # 안 되는데 20 m 로 두니, 철창 틈으로 빠져나간 빔이 방 밖 20 m 까지
+    # "여기 비어 있다" 고 칠했습니다. 실측 피해:
+    #     실제 방            2.4 x 3.0 m =  7.2 m^2
+    #     지도의 자유 공간              = 29.2 m^2  (4배)
+    #     최대 연결영역      17.65 x 5.75 m
+    #     로봇이 실제 주행한 범위  1.32 x 0.33 m   <- 대부분 가본 적 없는 곳
+    #
+    # Nav2 는 흰색을 "갈 수 있는 곳" 으로 보므로, 이대로 두면 planner 가
+    # 철창을 뚫는 경로를 냅니다. 주행량과 무관한 문제라 많이 돌아도 안
+    # 고쳐집니다 (오히려 보는 각도가 늘어 더 심해집니다).
+    #
+    # 4.0 m 근거: 방 대각선이 3.84 m 이므로 방 전체는 다 봅니다. 더 줄이면
+    # 구석에서 반대편 구석이 안 보입니다. 공간이 바뀌면 이 값도 바꾸세요.
+    #
+    # 참고: VLP-16 의 최소 측정 거리는 0.9 m 입니다(velodyne_vlp16.yaml).
+    # 좁은 방에서 벽에 0.9 m 안쪽으로 붙으면 그 벽이 안 보입니다.
+    #
+    # ── 2026-08-25: 4.0 -> 10.0 (인천공항 현장 대비, 출발 전 미리 적용) ──
+    # 공간 규모를 아직 모르는 상태라 FIELD_CHECKLIST 가 권하는 보수적
+    # 시작점을 그대로 씁니다: "공항 유리벽 때문에 처음부터 크게 잡는 건
+    # 위험합니다. 10 m 정도로 시작해서 지도를 보고 늘리는 쪽을 권합니다."
+    # 위 실험실 사고(20.0 이 유령 자유공간을 4배로 만든 것)가 유리벽에서
+    # 똑같이 재현될 수 있고, 유령 자유공간은 planner 가 유리로 돌진하는
+    # 경로를 내게 만듭니다.
+    #
+    # 현장에서 늘릴 때: 매핑 초반에 유리 구간을 지나면서 지도에 부챗살
+    # 모양 자유공간이 안 뻗는 것을 눈으로 확인한 뒤에만 올리세요. 올릴
+    # 때는 아래 loop_search_maximum_distance 와 nav2_params.yaml 의
+    # amcl.laser_max_range 를 반드시 같이 맞춰야 합니다 (셋이 연동됨).
+    resolution: 0.05
+    max_laser_range: 10.0
+    minimum_time_interval: 0.2
+    transform_timeout: 0.2
+    tf_buffer_duration: 30.0
+    stack_size_to_use: 40000000
+
+    # 젯슨 CPU 여유가 많지 않습니다 (데스크톱까지 같이 돌면 더 빠듯).
+    # 스캔을 너무 촘촘히 받으면 큐가 밀리므로 이동/회전 문턱을 둡니다.
+    use_scan_matching: true
+    use_scan_barycenter: true
+    minimum_travel_distance: 0.2
+    minimum_travel_heading: 0.2
+    scan_buffer_size: 20
+    scan_buffer_maximum_scan_distance: 20.0
+    link_match_minimum_response_fine: 0.1
+    # 1.5 -> 5.0 (2026-08-25). 체크리스트 표에는 없던 항목인데, 이것도
+    # 실험실(3~4 m) 기준으로 잡혀 있어서 같이 올렸습니다. 스캔 하나를 그래프의
+    # 다른 스캔과 이어붙일 최대 거리라, 1.5 m 로 두면 10 m 를 보는 상태에서도
+    # 1.5 m 안의 스캔끼리만 엮여 포즈그래프가 얇아집니다. slam_toolbox 기본값은
+    # 10.0 입니다. 매핑이 이상하면 원래대로 1.5 로 되돌려도 됩니다.
+    link_scan_maximum_distance: 5.0
+    # 3.0 -> 8.0 (2026-08-25). 루프 클로저 후보를 찾는 반경입니다.
+    # max_laser_range(10.0) 보다는 작게 둡니다 — 라이다가 못 본 거리까지
+    # 후보를 찾아봐야 매칭이 안 됩니다. max_laser_range 를 현장에서 바꾸면
+    # 이 값도 대략 그 80 % 로 같이 옮기세요.
+    loop_search_maximum_distance: 8.0
+    do_loop_closing: true
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.35
+    loop_match_minimum_response_fine: 0.45
+
+    correlation_search_space_dimension: 0.5
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1
+
+    loop_search_space_dimension: 8.0
+    loop_search_space_resolution: 0.05
+    loop_search_space_smear_deviation: 0.03
+
+    distance_variance_penalty: 0.5
+    angle_variance_penalty: 1.0
+    fine_search_angle_offset: 0.00349
+    coarse_search_angle_offset: 0.349
+    coarse_angle_resolution: 0.0349
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true
