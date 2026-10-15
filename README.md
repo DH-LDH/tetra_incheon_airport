@@ -6,12 +6,6 @@
 - `src/tetra_dsv_s_bringup` — 실기용. 구동보드 드라이버, 센서 설정, launch
 - `src/tetra_dsv_s_sim` — Gazebo Fortress 시뮬. 젯슨에는 받지 않습니다
 
-**작업 이력 · 검증 수치 · 함정 목록은 전부 [HANDOFF.md](HANDOFF.md) 에 있습니다.**
-이 README 는 "어떻게 돌리는가"만 답합니다. 왜 그런지가 궁금하면 HANDOFF 를 보세요.
-
-**새 공간에 나가서 매핑부터 자율주행까지 하는 날**은
-[FIELD_CHECKLIST.md](FIELD_CHECKLIST.md) 를 순서대로 따라가세요 — 공간이
-바뀔 때 반드시 다시 잡아야 하는 파라미터들이 정리돼 있습니다.
 
 ## 현재 상태 (2026-08-13)
 
